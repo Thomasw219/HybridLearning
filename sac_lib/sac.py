@@ -16,10 +16,10 @@ class SoftActorCritic(object):
                             value_lr    = 3e-4,
                             soft_q_lr   = 3e-4,
                             policy_lr   = 3e-4,
+                            device      = 'cuda:0',
                         ):
 
         # set up the networks
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.device = device
 
 

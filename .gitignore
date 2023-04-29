@@ -7,3 +7,4 @@ cleanup.sh
 MUJOCO*
 data/vid/*
 data/*
+logs/*

@@ -3,7 +3,7 @@ from torch.distributions import Normal
 
 class PathIntegral(object):
 
-    def __init__(self, model, samples=10, t_H=10, lam=0.1, eps=0.3):
+    def __init__(self, model, samples=10, t_H=10, lam=0.1, eps=0.3, device='cuda:0'):
 
 
         self.model           = model
@@ -12,9 +12,7 @@ class PathIntegral(object):
         self.lam             = lam
         self.samples         = samples
 
-        self.device = 'cpu'
-        if torch.cuda.is_available():
-            self.device = 'cuda'
+        self.device = device
 
         self.a = torch.zeros(t_H, self.num_actions).to(self.device)
         self.eps = Normal(torch.zeros(self.samples, self.num_actions).to(self.device),

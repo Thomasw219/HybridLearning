@@ -1,8 +1,9 @@
 import numpy as np
 import random
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import gym
+from torch.utils.tensorboard import SummaryWriter
 
 import sys
 import os
@@ -20,6 +21,7 @@ from mpc_lib import ModelBasedDeterControl, PathIntegral
 import argparse
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--device', type=str, default='cuda:0')
 parser.add_argument('--env',   type=str,   default='HalfCheetah-v2')
 parser.add_argument('--method', type=str, default='hlt_stoch')
 parser.add_argument('--seed', type=int, default=666)
@@ -91,15 +93,15 @@ if __name__ == '__main__':
     replay_buffer = [None] # placeholder
     model_replay_buffer = [None] # placeholder
 
-    device ='cpu'
-    if torch.cuda.is_available():
-        device  = 'cuda:0'
-        print('Using GPU Accel')
+    device  = args.device
+
+    timestring = datetime.now(tz=timezone(timedelta(hours=-4))).strftime("_%m-%d-%Y_%H-%M-%S") # EDT i think
+    logger = SummaryWriter(os.path.join('logs', f'{args.env}_{args.method}_{timestring}'))
 
     if base_method != 'sac':
         model = Model(state_dim, action_dim, def_layers=[200],AF=config['activation_fun']).to(device)
         model_replay_buffer = SARSAReplayBuffer(replay_buffer_size)
-        model_optim = ModelOptimizer(model, model_replay_buffer, lr=config['model_lr'])
+        model_optim = ModelOptimizer(model, model_replay_buffer, lr=config['model_lr'], device=device)
 
     if base_method != 'mpc':
         policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim,AF=config['activation_fun']).to(device)
@@ -110,22 +112,26 @@ if __name__ == '__main__':
                               replay_buffer=replay_buffer,
                               policy_lr=config['policy_lr'],
                               value_lr=config['value_lr'],
-                              soft_q_lr=config['soft_q_lr'])
+                              soft_q_lr=config['soft_q_lr'],
+                              device=device,)
 
     if args.method == 'hlt_stoch':
         hybrid_policy = StochPolicyWrapper(model, policy_net,
                                 samples=config['trajectory_samples'],
                                 t_H=config['horizon'],
-                                lam=config['lam'])
+                                lam=config['lam'],
+                                device=device,)
     elif args.method == 'hlt_deter':
         hybrid_policy = DetPolicyWrapper(model, policy_net,
                                         T=config['horizon'],
-                                        lr=config['planner_lr'])
+                                        lr=config['planner_lr'],
+                                        device=device,)
     elif args.method == 'mpc_stoch':
         planner = PathIntegral(model,
                                samples=config['trajectory_samples'],
                                t_H=config['horizon'],
-                               lam=config['lam'])
+                               lam=config['lam'],
+                               device=device,)
     elif args.method == 'mpc_deter':
         planner = ModelBasedDeterControl(model, T=config['horizon'])
     elif base_method == 'sac':
@@ -214,6 +220,7 @@ if __name__ == '__main__':
         if (len(replay_buffer) > batch_size) or (len(model_replay_buffer) > batch_size):
             print('ep rew', ep_num, episode_reward, frame_idx)
         rewards.append([frame_idx, episode_reward,ep_num])
+        logger.add_scalar('train/returns', episode_reward, frame_idx)
         ep_num += 1
     env.close()
     if args.log:

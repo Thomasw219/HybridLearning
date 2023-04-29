@@ -34,7 +34,7 @@ def compute_jacobian(inputs, output, create_graph=False):
 
 class DetPolicyWrapper(object):
 
-    def __init__(self, model, policy, T=10, lr=0.1, eps=1e-1, reg=1.0):
+    def __init__(self, model, policy, T=10, lr=0.1, eps=1e-1, reg=1.0, device='cuda:0'):
         self.model = model
         self.policy = policy
         self.T = T
@@ -44,9 +44,7 @@ class DetPolicyWrapper(object):
         self.state_dim = model.num_states
         self.action_dim = model.num_actions
 
-        self.device = 'cpu'
-        if torch.cuda.is_available():
-            self.device = 'cuda:0'
+        self.device = device
 
         self.u = torch.zeros(T, self.action_dim).to(self.device)
         self.u.requires_grad = True

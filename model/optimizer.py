@@ -10,7 +10,7 @@ from .jacobian import jacobian
 
 class ModelOptimizer(object):
 
-    def __init__(self, model, replay_buffer, lr=1e-2, eps=1e-1, lam=0.95):
+    def __init__(self, model, replay_buffer, lr=1e-2, eps=1e-1, lam=0.95, device='cuda:0'):
 
         # reference the model and buffer
         self.model          = model
@@ -22,9 +22,7 @@ class ModelOptimizer(object):
         self._lam = lam
         self.log = {'loss' : [], 'rew_loss': []}
 
-        self.device = 'cpu'
-        if torch.cuda.is_available():
-            self.device = 'cuda'
+        self.device = device
 
     def update_model(self, batch_size, mini_iter=1):
 

@@ -3,7 +3,7 @@ from torch.distributions import Normal
 
 class StochPolicyWrapper(object):
 
-    def __init__(self, model, policy, samples=10, t_H=10, frame_skip=5, lam=0.1):
+    def __init__(self, model, policy, samples=10, t_H=10, frame_skip=5, lam=0.1, device='cuda:0'):
 
 
         self.model          = model
@@ -13,9 +13,7 @@ class StochPolicyWrapper(object):
         self.lam            = lam
         self.samples        = samples
 
-        self.device = 'cpu'
-        if torch.cuda.is_available():
-            self.device = 'cuda'
+        self.device = device
 
         self.a = torch.zeros(t_H, self.num_actions)
         self.a = self.a.to(self.device)
