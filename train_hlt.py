@@ -2,19 +2,17 @@ import numpy as np
 import random
 import pickle
 from datetime import datetime
+import gym
 
 import sys
 import os
 import yaml
 
-# local imports
-import envs
-
 import torch
 from sac_lib import SoftActorCritic
 from sac_lib import PolicyNetwork
 from sac_lib import ReplayBuffer
-from sac_lib import NormalizedActions
+from sac_lib import NormalizedActions, EpisodeLengthWrapper
 from hlt_lib import StochPolicyWrapper, DetPolicyWrapper
 from model import ModelOptimizer, Model, SARSAReplayBuffer
 from mpc_lib import ModelBasedDeterControl, PathIntegral
@@ -22,7 +20,7 @@ from mpc_lib import ModelBasedDeterControl, PathIntegral
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env',   type=str,   default='InvertedPendulumEnv')
+parser.add_argument('--env',   type=str,   default='HalfCheetah-v2')
 parser.add_argument('--method', type=str, default='hlt_stoch')
 parser.add_argument('--seed', type=int, default=666)
 parser.add_argument('--done_util', dest='done_util', action='store_true')
@@ -53,14 +51,14 @@ if __name__ == '__main__':
         if args.env in list(config_dict.keys()):
             config.update(config_dict[args.env])
         else:
-            raise ValueError('env not found config file')
+            print('env not found config file')
 
     env_name = args.env
     try:
-        env = NormalizedActions(envs.env_list[env_name](render=args.render))
+        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name, render=args.render)), config['max_steps'])
     except TypeError as err:
         print('no argument render,  assuming env.render will just work')
-        env = NormalizedActions(envs.env_list[env_name]())
+        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name)), config['max_steps'])
 
     assert np.any(np.abs(env.action_space.low) <= 1.) and  np.any(np.abs(env.action_space.high) <= 1.), 'Action space not normalizd'
     if args.render:

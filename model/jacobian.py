@@ -2,9 +2,9 @@ import numpy as np
 import torch
 import torch.autograd as autograd
 from torch.autograd import Variable
-from torch.autograd.gradcheck import zero_gradients
 import torch.nn.functional as F
 
+from utils import zero_gradients
 
 def jacobian(y, x):
     """Computes the Jacobian of f w.r.t x.

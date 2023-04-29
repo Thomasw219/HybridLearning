@@ -1,10 +1,11 @@
 import torch
 import torch.autograd as autograd
 from torch.autograd import Variable
-from torch.autograd.gradcheck import zero_gradients
 import torch.nn.functional as F
 from torch.distributions import Normal
 # import torch.optim as optim
+
+from utils import zero_gradients
 
 def compute_jacobian(inputs, output, create_graph=False):
     """

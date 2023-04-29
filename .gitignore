@@ -6,3 +6,4 @@ cleanup.sh
 *.bat
 MUJOCO*
 data/vid/*
+data/*
