@@ -221,6 +221,52 @@ if __name__ == '__main__':
             print('ep rew', ep_num, episode_reward, frame_idx)
         rewards.append([frame_idx, episode_reward,ep_num])
         logger.add_scalar('train/returns', episode_reward, frame_idx)
+
+        if ep_num % 10 == 0:
+            print("EVALUATING")
+            episode_rewards = []
+            with torch.no_grad():
+                for _ in range(10):
+                    state = env.reset()
+                    if base_method == 'sac':
+                        action = policy_net.get_action(state)
+                    elif base_method == 'mpc':
+                        planner.reset()
+                        action, _ = planner(state)
+                    else:
+                        hybrid_policy.reset()
+                        action, _ = hybrid_policy(state)
+
+                    episode_reward = 0
+                    done = False
+                    for step in range(max_steps):
+                        for _ in range(frame_skip):
+                            next_state, reward, done, _ = env.step(action.copy())
+
+                        if base_method == 'sac':
+                            next_action = policy_net.get_action(state)
+                        elif base_method == 'mpc':
+                            next_action, _ = planner(next_state)
+                            if args.method == 'mpc_deter':
+                                # print(step,next_action)
+                                next_action += np.random.normal(0., 1.0*(0.999**(frame_idx+1)), size=(action_dim,))
+                                # print(step,next_action)
+                        elif base_method == 'hlt':
+                            next_action, rho = hybrid_policy(next_state)
+                            if args.method == 'hlt_deter':
+                                next_action += np.random.normal(0., 1.0*(0.999**(frame_idx+1)), size=(action_dim,))
+
+                        state = next_state
+                        action = next_action
+                        episode_reward += reward
+
+                        if args.done_util:
+                            if done:
+                                break
+                    episode_rewards.append(episode_reward)
+            eval_rewards = np.mean(episode_rewards)
+            print("EVAL REWARDS", eval_rewards)
+            logger.add_scalar('eval/returns', eval_rewards, frame_idx)
         ep_num += 1
     env.close()
     if args.log:

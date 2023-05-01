@@ -8,8 +8,8 @@ default:
     value_lr: !!float 3e-4
     soft_q_lr: !!float 3e-4
     reward_scale: 1.0
-    horizon: 5
+    horizon: 10 # for half cheetah
     model_iter: 5
-    trajectory_samples: 20
-    lam: 0.1
+    trajectory_samples: 60
+    lam: 0.2
     activation_fun: 'ReLU'
