@@ -3,7 +3,7 @@ default:
     max_steps: 100
     max_frames: 1000000
     frame_skip: 1
-    policy_lr: !!float 3e-3
+    policy_lr: !!float 3e-4
     value_lr: !!float 3e-4
     soft_q_lr: !!float 3e-4
     reward_scale: 1.0

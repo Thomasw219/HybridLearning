@@ -31,13 +31,13 @@ class StochPolicyWrapper(object):
             s0 = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             s = s0.repeat(self.samples, 1)
 
-            mu, log_std = self.policy(s)
+            mu, std = self.policy(s)
 #             sk, da, log_prob = [], [], []
             sk = torch.zeros(self.t_H,self.samples).to(self.device)
             da = torch.zeros(self.t_H,self.samples,self.num_actions).to(self.device)
             log_prob = torch.zeros(self.t_H,self.samples).to(self.device)
             for t in range(self.t_H):
-                pi = Normal(mu, log_std.exp())
+                pi = Normal(mu, std)
                 v = torch.tanh(pi.sample())
                 da_t = v - self.a[t].expand_as(v)
                 log_prob[t] = pi.log_prob(da_t).sum(1)
@@ -47,7 +47,7 @@ class StochPolicyWrapper(object):
                 da[t] = da_t
                 # da.append(v)
                 s, rew = self.model.step(s, v)
-                mu, log_std = self.policy(s)
+                mu, std = self.policy(s)
                 sk[t] = rew.squeeze()
 
 #             sk = torch.stack(sk)

@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 
 
-_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class _AF(nn.Module):
     def __init__(self):
         super(_AF, self).__init__()
@@ -42,13 +41,13 @@ class PolicyNetwork(nn.Module):
         else:
             self.sin = False
             self.mu = nn.Sequential(
-                nn.Linear(num_inputs, hidden_size), nn.ReLU(), #_AF(),
-                # nn.Linear(hidden_size, hidden_size), nn.ReLU(),#_AF(),
+                nn.Linear(num_inputs, hidden_size), nn.Tanh(), #_AF(),
+                nn.Linear(hidden_size, hidden_size), nn.Tanh(),#_AF(),
                 nn.Linear(hidden_size, num_actions*2)
             )
             # initialize weights
-            self.mu[-1].weight.data.uniform_(-init_w, init_w)
-            self.mu[-1].bias.data.uniform_(-init_w, init_w)
+            # self.mu[-1].weight.data.uniform_(-init_w, init_w)
+            # self.mu[-1].bias.data.uniform_(-init_w, init_w)
 
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
@@ -79,13 +78,12 @@ class PolicyNetwork(nn.Module):
         # x = F.relu(self.layer2(x))
         # mean    = self.mean_layer(x)
         # log_std = self.log_std_layer2(F.relu(self.log_std_layer1(x)))
-        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+        # log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
 
-        return mu, log_std
+        return mu, nn.functional.softplus(log_std)
 
     def evaluate(self, state, epsilon=1e-6):
-        mean, log_std = self.forward(state)
-        std = log_std.exp()
+        mean, std = self.forward(state)
 
         normal = Normal(mean, std)
         z = normal.rsample()
@@ -94,13 +92,12 @@ class PolicyNetwork(nn.Module):
         log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon)
         log_prob = log_prob.sum(-1, keepdim=True)
 
-        return action, log_prob, z, mean, log_std
+        return action, log_prob, z, mean, std
 
 
     def get_action(self, state):
-        state = torch.FloatTensor(state).unsqueeze(0).to(_device)
-        mean, log_std = self.forward(state)
-        std = log_std.exp()
+        state = torch.FloatTensor(state).unsqueeze(0).to(self.mu[0].weight.device)
+        mean, std = self.forward(state)
 
         normal = Normal(mean, std)
         z      = normal.sample()

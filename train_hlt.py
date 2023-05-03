@@ -10,9 +10,10 @@ import os
 import yaml
 
 import torch
-from sac_lib import SoftActorCritic
-from sac_lib import PolicyNetwork
-from sac_lib import ReplayBuffer
+# from sac_lib import SoftActorCritic
+# from sac_lib import PolicyNetwork
+# from sac_lib import ReplayBuffer
+from sac_lib.alternate_sac import SAC, ReplayMemory
 from sac_lib import NormalizedActions, EpisodeLengthWrapper
 from hlt_lib import StochPolicyWrapper, DetPolicyWrapper
 from model import ModelOptimizer, Model, SARSAReplayBuffer
@@ -34,6 +35,40 @@ parser.set_defaults(log=True)
 parser.add_argument('--render', dest='render', action='store_true')
 parser.add_argument('--no_render', dest='render', action='store_false')
 parser.set_defaults(render=False)
+
+parser.add_argument('--policy_type', default="tanh_gaussian")
+parser.add_argument('--std_scale',type=float,default=1.0)
+parser.add_argument('--gamma', type=float, default=0.99)
+parser.add_argument('--tau', type=float, default=0.005)
+parser.add_argument('--lr', type=float, default=0.0003)
+parser.add_argument('--alpha', type=float, default=0.2)
+parser.add_argument('--automatic_entropy_tuning', action='store_true')
+parser.add_argument('--batch_size', type=int, default=256)
+parser.add_argument('--num_steps', type=int, default=1000001)
+parser.add_argument('--h_dim', type=int, default=256)
+parser.add_argument('--updates_per_step', type=int, default=1)
+parser.add_argument('--start_steps', type=int, default=10000)
+parser.add_argument('--target_update_interval', type=int, default=1)
+parser.add_argument('--eval_freq',type=int,default=10)
+parser.add_argument('--deterministic_eval',action='store_true')
+parser.add_argument('--n_eval_episodes',type=int,default=10)
+parser.add_argument('--replay_size', type=int, default=1000000)
+parser.add_argument('--q_ensemble_members', type=int, default=2)
+parser.add_argument('--q_subset_size',type=int,default=2)
+parser.add_argument('--q_layer_norm',action='store_true')
+parser.add_argument('--no_entropy_backup',action='store_true')
+parser.add_argument('--ep_len', type=int, default=None)
+parser.add_argument('--save_gif',action='store_true')
+parser.add_argument('--save_policy',action='store_true')
+parser.add_argument('--no_termination',action='store_true')
+parser.add_argument('--target_entropy',type=float,default=1.0,help='Sets the scale factor on the target entropy for automatic ent tuning')
+parser.add_argument('--huber',action='store_true')
+parser.add_argument('--sparse',action='store_true')
+parser.add_argument('--vel_thresh',type=float,default=1.0)
+parser.add_argument('--cpu',action='store_true')
+parser.add_argument('--save_data',action='store_true')
+parser.add_argument('--load_data',action='store_true')
+parser.add_argument('--data_file_name',type=str,default=None)
 
 args = parser.parse_args()
 print(args)
@@ -57,10 +92,10 @@ if __name__ == '__main__':
 
     env_name = args.env
     try:
-        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name, render=args.render)), config['max_steps'])
+        env = EpisodeLengthWrapper(gym.make(env_name, render=args.render), config['max_steps'])
     except TypeError as err:
         print('no argument render,  assuming env.render will just work')
-        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name)), config['max_steps'])
+        env = EpisodeLengthWrapper(gym.make(env_name), config['max_steps'])
 
     assert np.any(np.abs(env.action_space.low) <= 1.) and  np.any(np.abs(env.action_space.high) <= 1.), 'Action space not normalizd'
     if args.render:
@@ -88,7 +123,7 @@ if __name__ == '__main__':
 
     action_dim = env.action_space.shape[0]
     state_dim  = env.observation_space.shape[0]
-    hidden_dim = 128
+    hidden_dim = 256
     replay_buffer_size = 1000000
     replay_buffer = [None] # placeholder
     model_replay_buffer = [None] # placeholder
@@ -96,7 +131,7 @@ if __name__ == '__main__':
     device  = args.device
 
     timestring = datetime.now(tz=timezone(timedelta(hours=-4))).strftime("_%m-%d-%Y_%H-%M-%S") # EDT i think
-    logger = SummaryWriter(os.path.join('logs', f'{args.env}_{args.method}_{timestring}'))
+    logger = SummaryWriter(os.path.join('logs', f'{args.env}_{args.method}_seed_{args.seed}_{timestring}'))
 
     if base_method != 'sac':
         model = Model(state_dim, action_dim, def_layers=[200],AF=config['activation_fun']).to(device)
@@ -104,16 +139,23 @@ if __name__ == '__main__':
         model_optim = ModelOptimizer(model, model_replay_buffer, lr=config['model_lr'], device=device)
 
     if base_method != 'mpc':
-        policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim,AF=config['activation_fun']).to(device)
-        replay_buffer = ReplayBuffer(replay_buffer_size)
-        sac = SoftActorCritic(policy=policy_net,
-                              state_dim=state_dim,
-                              action_dim=action_dim,
-                              replay_buffer=replay_buffer,
-                              policy_lr=config['policy_lr'],
-                              value_lr=config['value_lr'],
-                              soft_q_lr=config['soft_q_lr'],
-                              device=device,)
+        # policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim,AF=config['activation_fun']).to(device)
+        # replay_buffer = ReplayBuffer(replay_buffer_size)
+        # sac = SoftActorCritic(policy=policy_net,
+        #                       state_dim=state_dim,
+        #                       action_dim=action_dim,
+        #                       replay_buffer=replay_buffer,
+        #                       policy_lr=config['policy_lr'],
+        #                       value_lr=config['value_lr'],
+        #                       soft_q_lr=config['soft_q_lr'],
+        #                       device=device,)
+        replay_buffer = ReplayMemory(replay_buffer_size, args.seed)
+        sac = SAC(
+            state_dim=state_dim,
+            action_space=env.action_space,
+            args=args,
+            )
+        policy_net = sac.policy
 
     if args.method == 'hlt_stoch':
         hybrid_policy = StochPolicyWrapper(model, policy_net,
@@ -146,7 +188,7 @@ if __name__ == '__main__':
 
     frame_idx   = 0
     rewards     = []
-    batch_size  = 128
+    batch_size  = 256
 
     ep_num = 0
     while (frame_idx < max_frames):
@@ -166,11 +208,14 @@ if __name__ == '__main__':
             for _ in range(frame_skip):
                 next_state, reward, done, _ = env.step(action.copy())
 
+            mask = 1 if (step + 1) == env._max_episode_length else float(not done)
+            # mask = not mask
             if base_method == 'sac':
-                next_action = policy_net.get_action(state)
-                replay_buffer.push(state, action, reward, next_state, done)
+                next_action = policy_net.get_action(next_state)
+                replay_buffer.push(state, action, reward, next_state, mask)
                 if len(replay_buffer) > batch_size:
-                    sac.update(batch_size)
+                    # sac.update(batch_size)
+                    sac.update(replay_buffer, batch_size)
             elif base_method == 'mpc':
                 next_action, _ = planner(next_state)
                 model_replay_buffer.push(state, action, reward_scale * reward, next_state, next_action, done)
@@ -185,9 +230,10 @@ if __name__ == '__main__':
                 if args.method == 'hlt_deter':
                     next_action += np.random.normal(0., 1.0*(0.999**(frame_idx+1)), size=(action_dim,))
                 model_replay_buffer.push(state, action, reward_scale * reward, next_state, next_action, done)
-                replay_buffer.push(state, action, reward, next_state, done)
+                replay_buffer.push(state, action, reward, next_state, mask)
                 if len(replay_buffer) > batch_size:
-                    sac.update(batch_size)
+                    # sac.update(batch_size)
+                    sac.update(replay_buffer, batch_size)
                     model_optim.update_model(batch_size, mini_iter=config['model_iter'])
 
             state = next_state
@@ -244,7 +290,7 @@ if __name__ == '__main__':
                             next_state, reward, done, _ = env.step(action.copy())
 
                         if base_method == 'sac':
-                            next_action = policy_net.get_action(state)
+                            next_action = policy_net.get_action(next_state)
                         elif base_method == 'mpc':
                             next_action, _ = planner(next_state)
                             if args.method == 'mpc_deter':

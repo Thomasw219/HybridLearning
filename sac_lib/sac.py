@@ -12,7 +12,7 @@ from .valuenetwork import ValueNetwork
 class SoftActorCritic(object):
 
     def __init__(self, policy, state_dim, action_dim, replay_buffer,
-                            hidden_dim  = 128,
+                            hidden_dim  = 256,
                             value_lr    = 3e-4,
                             soft_q_lr   = 3e-4,
                             policy_lr   = 3e-4,
@@ -30,8 +30,8 @@ class SoftActorCritic(object):
 
         # ent coeff
         self.target_entropy = -action_dim
-        self.log_ent_coef = torch.FloatTensor(np.log(np.array([1.0]))).to(device)
-        self.log_ent_coef.requires_grad = True
+        self.log_ent_coef = torch.FloatTensor(np.log(np.array([0.2]))).to(device)
+        # self.log_ent_coef.requires_grad = True
 
         # copy the target params over
         for target_param, param in zip(self.target_soft_q_net.parameters(), self.soft_q_net.parameters()):
@@ -53,7 +53,7 @@ class SoftActorCritic(object):
 
     def update(self, batch_size,
                             gamma       = 0.99,
-                            soft_tau    = 0.01
+                            soft_tau    = 0.005
                       ):
         state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
 
@@ -66,11 +66,11 @@ class SoftActorCritic(object):
         ent_coef = torch.exp(self.log_ent_coef.detach())
 
 
-        new_action, log_prob, z, mean, log_std = self.policy_net.evaluate(next_state)
+        new_action, log_prob, z, mean, std = self.policy_net.evaluate(next_state)
 
         target_q1_value, target_q2_value = self.target_soft_q_net(next_state, new_action)
         target_value = reward \
-                        + (1 - done) * gamma * (torch.min(target_q2_value, target_q2_value) \
+                        + (1 - done) * gamma * (torch.min(target_q1_value, target_q2_value) \
                                     - ent_coef * log_prob)
 
         expected_q1_value, expected_q2_value = self.soft_q_net(state, action)
@@ -82,10 +82,10 @@ class SoftActorCritic(object):
         q_value_loss.backward()
         self.soft_q_optimizer.step()
 
-        new_action, log_prob, z, mean, log_std = self.policy_net.evaluate(state)
+        new_action, log_prob, z, mean, std = self.policy_net.evaluate(state)
         expected_new_q1_value, expected_new_q2_value = self.soft_q_net(state, new_action)
 
-        expected_new_q_value = torch.min(expected_new_q1_value, expected_new_q2_value)
+        expected_new_q_value = expected_new_q1_value + expected_new_q2_value / 2
 
         policy_loss = (ent_coef * log_prob - expected_new_q_value).mean()
 
@@ -93,10 +93,10 @@ class SoftActorCritic(object):
         policy_loss.backward()
         self.policy_optimizer.step()
 
-        self.ent_coef_optimizer.zero_grad()
+        # self.ent_coef_optimizer.zero_grad()
         ent_loss = torch.mean(torch.exp(self.log_ent_coef) * (-log_prob - self.target_entropy).detach())
-        ent_loss.backward()
-        self.ent_coef_optimizer.step()
+        # ent_loss.backward()
+        # self.ent_coef_optimizer.step()
 
         for target_param, param in zip(self.target_soft_q_net.parameters(), self.soft_q_net.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) +
