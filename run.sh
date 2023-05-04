@@ -19,8 +19,9 @@
 
 for method in 'sac__' 'hlt_stoch' 'mpc_stoch'
 do
-    for env in 'HalfCheetah-v2'
+    for env in 'Ant-v3' 'Walker2d-v3'
     do
+        python3 train_hlt.py --seed 0 --env $env --method $method --device cuda:0 &
         python3 train_hlt.py --seed 1 --env $env --method $method --device cuda:0 &
         python3 train_hlt.py --seed 2 --env $env --method $method --device cuda:0 &
         python3 train_hlt.py --seed 3 --env $env --method $method --device cuda:1 &
