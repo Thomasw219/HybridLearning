@@ -47,6 +47,7 @@ elif args.algo == 'ppo':
     model = PPO(
         "MlpPolicy",
         env,
+        n_steps=1000,
         verbose=1,
         device=args.device,
     )
