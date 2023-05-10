@@ -92,10 +92,10 @@ if __name__ == '__main__':
 
     env_name = args.env
     try:
-        env = EpisodeLengthWrapper(gym.make(env_name, render=args.render), config['max_steps'])
+        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name, render=args.render)), config['max_steps'])
     except TypeError as err:
         print('no argument render,  assuming env.render will just work')
-        env = EpisodeLengthWrapper(gym.make(env_name), config['max_steps'])
+        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name)), config['max_steps'])
 
     assert np.any(np.abs(env.action_space.low) <= 1.) and  np.any(np.abs(env.action_space.high) <= 1.), 'Action space not normalizd'
     if args.render:
