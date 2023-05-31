@@ -3,6 +3,7 @@ import random
 import pickle
 from datetime import datetime, timezone, timedelta
 import gym
+from comet_ml import Experiment
 from torch.utils.tensorboard import SummaryWriter
 
 import sys
@@ -73,6 +74,15 @@ parser.add_argument('--data_file_name',type=str,default=None)
 args = parser.parse_args()
 print(args)
 
+class DMObsWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self._max_episode_steps = env._max_episode_steps
+        self.observation_space = env.observation_space['observations']
+
+    def observation(self,obs):
+        return obs['observations']
+
 if __name__ == '__main__':
     base_method = args.method[:3]
     if args.method == 'sac__':
@@ -91,11 +101,10 @@ if __name__ == '__main__':
             print('env not found config file')
 
     env_name = args.env
-    try:
-        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name, render=args.render)), config['max_steps'])
-    except TypeError as err:
-        print('no argument render,  assuming env.render will just work')
-        env = EpisodeLengthWrapper(NormalizedActions(gym.make(env_name)), config['max_steps'])
+    env = gym.make(env_name, **({'environment_kwargs' : {'flat_observation':True}} if 'dm2gym' in env_name else {}))
+    if 'dm2gym' in env_name:
+        env = DMObsWrapper(env)
+    env = EpisodeLengthWrapper(NormalizedActions(env), config['max_steps'])
 
     assert np.any(np.abs(env.action_space.low) <= 1.) and  np.any(np.abs(env.action_space.high) <= 1.), 'Action space not normalizd'
     if args.render:
@@ -131,6 +140,14 @@ if __name__ == '__main__':
     device  = args.device
 
     timestring = datetime.now(tz=timezone(timedelta(hours=-4))).strftime("_%m-%d-%Y_%H-%M-%S") # EDT i think
+    experiment = Experiment(
+        api_key = "e1Xmlzbz1cCLgwe0G8m7G58ns",
+        project_name = args.method if 'sac' not in args.method else 'sac',
+        workspace="thomasw219",
+    )
+    experiment.add_tag(env_name)
+    experiment.log_parameters(config)
+    experiment.log_parameters(vars(args))
     logger = SummaryWriter(os.path.join('logs', f'{args.env}_{args.method}_seed_{args.seed}_{timestring}'))
 
     if base_method != 'sac':
@@ -267,6 +284,7 @@ if __name__ == '__main__':
             print('ep rew', ep_num, episode_reward, frame_idx)
         rewards.append([frame_idx, episode_reward,ep_num])
         logger.add_scalar('train/returns', episode_reward, frame_idx)
+        experiment.log_metric('train/returns', episode_reward, step=frame_idx)
 
         if ep_num % 10 == 0:
             print("EVALUATING")
@@ -313,6 +331,7 @@ if __name__ == '__main__':
             eval_rewards = np.mean(episode_rewards)
             print("EVAL REWARDS", eval_rewards)
             logger.add_scalar('eval/returns', eval_rewards, frame_idx)
+            experiment.log_metric('eval/returns', eval_rewards, step=frame_idx)
         ep_num += 1
     env.close()
     if args.log:

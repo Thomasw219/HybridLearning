@@ -2,8 +2,8 @@ from typing import Tuple, Union
 import gym
 
 class EpisodeLengthWrapper(gym.Wrapper):
-    def __init__(self, env: gym.Env, max_episode_length: int):
-        super().__init__(env)
+    def __init__(self, env: gym.Env, max_episode_length: int, **kwargs):
+        super().__init__(env, **kwargs)
         self._max_episode_length = max_episode_length
         self._current_episode_length = 0
 
