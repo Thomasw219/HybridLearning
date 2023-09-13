@@ -17,15 +17,15 @@
 #     # done
 # done
 
-for method in 'sac__' #'sac__' 'hlt_stoch' 'mpc_stoch'
+for method in 'hlt_stoch' #'sac__' 'hlt_stoch' 'mpc_stoch'
 do
-    for env in 'dm2gym:HopperHop-v0'
+    for env in 'Walker2d-v3'
     do
-        python3 train_hlt.py --seed 0 --env $env --method $method --device cuda:0 &
-        python3 train_hlt.py --seed 1 --env $env --method $method --device cuda:0 &
-        python3 train_hlt.py --seed 2 --env $env --method $method --device cuda:0 &
-        python3 train_hlt.py --seed 3 --env $env --method $method --device cuda:1 &
-        python3 train_hlt.py --seed 4 --env $env --method $method --device cuda:1 &
+        python3 train_hlt.py --seed 0 --env $env --method $method --device cuda:0 --alpha .2 --no_entropy_backup --q_layer_norm &
+        python3 train_hlt.py --seed 1 --env $env --method $method --device cuda:1 --alpha .2 --no_entropy_backup --q_layer_norm &
+        python3 train_hlt.py --seed 2 --env $env --method $method --device cuda:2 --alpha .2 --no_entropy_backup --q_layer_norm &
+        python3 train_hlt.py --seed 3 --env $env --method $method --device cuda:3 --alpha .2 --no_entropy_backup --q_layer_norm &
+        python3 train_hlt.py --seed 4 --env $env --method $method --device cuda:0 --alpha .2 --no_entropy_backup --q_layer_norm &
         wait
         # for i in $(seq 13 100 950)
         # do
